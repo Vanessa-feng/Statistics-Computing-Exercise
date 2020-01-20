@@ -1,0 +1,139 @@
+---
+title: 'STAT 206 Lab 8'
+author: Xin Feng(Vanessa)
+date: 11/23/2019
+output: pdf_document
+---
+
+**Due Monday, November 25, 5:00 PM**
+
+***General instructions for labs***: Labs must be completed as a pdf file.  Give the commands to answer each question in its own code block, which will also produce plots that will be automatically embedded in the output file. Each answer must be supported by written statements as well as any code used. 
+
+***Agenda***: Fit polynomial regression models to the electricity usage data, use $K$-fold cross-validation to automatically select degree of the polynomial
+
+Polynomial regression
+==========
+
+The polynomial regression model posits that a response variable $Y$ and explanatory variable $X$ are related by the equation.
+\[
+Y = \sum_{j=0}^d \beta_j X^j + \epsilon \; .
+\]
+The number $d$ is called the degree of the polynomial. Polynomial regression reduces to linear regression when $d=1$. Its
+flexibility and complexity increase as $d$ increases. The cases $d=2$ and $d=3$ are usually referred to as quadratic and cubic. The polynomial regression model can be expressed as a $d+1$ parameter linear model by considering $(X_0,X_1,X_2, \dots ,X_d)$ as explanatory variables. This is done by `poly()` and can be combined with `lm()` to fit a polynomial regression model. In the following example, we fit a degree-3 polynomial, or cubic, regression model using variables $y$ and $x$ in the dataframe `df`.
+
+```{r, eval=FALSE}
+degree <- 3
+obj <- lm(y ~ poly(x, degree), data = df)
+```
+
+`electemp' dataset
+==========
+
+The `electemp' dataset has 55 observations on monthly electricity usage and average temperature for a house in Westchester County, New York
+
+```{r}
+url <- 'http://www.faculty.ucr.edu/~jflegal/electemp.txt'
+electemp <- read.table(url)
+```
+
+1. Create a scatterplot of `temp` and `usage` with `ggplot2` that includes the least squares fits of a linear and quadratic regression models.  You should also include a legend on the plot.
+```{r}
+library(ggplot2)
+# summary(electemp)
+# View(electemp)
+x <- electemp$temp
+y <- electemp$usage
+p <- ggplot(data=electemp, aes(temp, usage)) + geom_point(color="grey40") 
+p1 <- geom_smooth(method='lm', formula=y~x, aes(color="Linear regression")) 
+p2 <- geom_smooth(method='lm', formula=y~poly(x,2), 
+                  aes(color="Quadratic regression")) 
+p3 <- scale_color_manual(name="Regression methods", values=c("blue", "red"))
+p+p1+p2+p3
+```
+
+2. Does the linear or quadratic model fit the data better?
+```{r}
+# According the picture, I think the quadratic regression model fit the data better.
+fit1 <- lm(y~x)
+fit2 <- lm(y~poly(x,2))
+summary(fit1)
+summary(fit2)
+# R square value in Model II greater than Model I, therefore, the quadratic regression 
+# model is better.
+```
+3. Write a function `cv_poly()` that performs $K$-fold cross-validation to estimate the mean squared prediction error (MSPE) of polynomial regression. It takes vectors $x$ and $y$ containing observations of the explanatory and response variables, a vector degree of the degrees of polynomial models to fit, and a number $K$ indicating the number of folds for cross-validation. It returns a $K \times D$ matrix, where $K$ is the number of folds and $D$ is the number of different degree models that are being fit. The entries of the matrix are the MSPE for each fold and degree polynomial model being fit.
+```{r}
+library(stats)
+mspe_func <- function(test_data, train_data, degree){
+  x <- train_data$temp
+  y <- train_data$usage
+  fit <- lm(y~poly(x, degree))
+  mspe <- mean((test_data$usage - predict(fit, data.frame(x=test_data$temp),
+                                          interval="prediction"))^2)
+  return(mspe)
+}
+mspe_func(electemp[1:5,],electemp[-1:-5,],2)
+```
+```{r}
+cv_ploy <- function(X, Y, degrees, K){
+  D <- length(degrees)
+  N <- length(y)
+  mspe <- matrix(nrow=K, ncol=D)
+  index <- append(seq(1, N, N%/%K),N)
+  if(K==1){
+    return(FALSE)
+  }
+  for(i in 1:K){
+    test_data <- data.frame(temp=X[index[i]:index[i+1]],usage=y[index[i]:index[i+1]])
+    train_data <- data.frame(temp=X[-index[i]:-index[i+1]], usage=Y[-index[i]:-index[i+1]])
+    mspe[i,] <- sapply(degrees,mspe_func,test_data=test_data,train_data=train_data)
+  }
+  rownames(mspe) <- paste("K=",1:K)
+  colnames(mspe) <- paste("D=",1:D)
+  return(mspe)
+}
+# cv_ploy(x,y,c(1,2,3),5)
+
+```
+4. Use `cv_poly()` to estimate the MSPE of polynomial regression on the electricity usage data by $K=10$-fold cross-validation for $d=1,2,…,8$. Note that `cv_poly()` should return a matrix, call it `cv_error` with $K$ rows corresponding to the $K$ different validation sets. 
+```{r}
+cv_error <- cv_ploy(x,y,1:8,10)
+cv_error
+```
+5. Plot the estimated MSPE (by averaging across the $K$ folds) versus degree of the polynomial. What degree polynomial would you select according to cross-validation?
+```{r}
+mspe_degree <- colMeans(cv_error)
+plot(mspe_degree, xlab="Degree", ylab="Mean of MSPE", 
+     main="Estimated MSPE vs Degree of Polynomial(K=10)")
+# I select degree=2, which has a least MSPE.
+```
+6. Repeat the preceding problem for $K=5$ and leave-one-out cross-validation ($K=n$). What do you notice about the time it takes to compute the cross-validation? How do the results change with $K$?
+```{r}
+t1 <- Sys.time()
+cv_error_2 <- cv_ploy(x,y,1:8,10)
+Sys.time()-t1
+
+t2 <- Sys.time()
+cv_error_3 <- cv_ploy(x,y,1:8,length(x))
+Sys.time()-t2
+# K=n takes much more time than K=5(n=55>5)
+# The greater of K, the more time it takes.
+```
+7. Plot the estimated MSPE versus degree of the polynomial. What degree polynomial would you select according to cross-validation? Are there differences between $K=5$, $K=10$, and leave-one-out estimates of MSPE?
+```{r}
+mspe_degree_2 <- colMeans(cv_error_2)
+plot(mspe_degree, xlab="Degree", ylab="Mean of MSPE", 
+     main="Estimated MSPE vs Degree of Polynomial(K=5)")
+# Select degree=2, which has a least MSPE. 
+mspe_degree_3 <- colMeans(cv_error_3)
+plot(mspe_degree, xlab="Degree", ylab="Mean of MSPE", 
+     main="Estimated MSPE vs Degree of Polynomial(K=55)")
+# Select degree=2, which has a least MSPE. 
+# The results are the same whatever K is.
+mspe_degree_2
+mspe_degree_3
+```
+8. Reproduce your first plot and add a layer showing the polynomial regression model selected by cross-validation by modifying the following code.
+```{r}
+p + p2 + p3
+```

@@ -1,0 +1,184 @@
+---
+title: "STAT 206 Lab 1"
+author: "Vanessa Feng"
+date: 10/06/2019
+output: pdf_document
+---
+
+**Due Monday, October 7, 5:00 PM**
+
+***General instructions for labs***: Labs must be completed as a pdf file.  Give the commands to answer each question in its own code block, which will also produce plots that will be automatically embedded in the output file. Each answer must be supported by written statements as well as any code used. 
+
+***Agenda***: Manipulating data objects; using built-in functions,
+  doing numerical calculations, and basic plots; reinforcing core probabilistic
+  ideas.
+
+Background
+----------
+
+The exponential distribution is defined by its cumulative distribution function
+
+$$ F(x) = 1-e^{-\lambda x} $$
+
+The R function `rexp` generates random variables with an exponential
+distribution.
+
+```
+rexp(n=10, rate=5)
+```
+
+produces 10 exponentially-distributed numbers with rate ($\lambda$) of 5.  If
+the second argument is omitted, the default rate is 1; this is the ``standard
+exponential distribution''.
+
+## Part I
+
+----------
+
+#### 1. Generate 200 random values from the standard exponential distribution and store them in a vector `exp.draws.1`.  Find the mean and standard deviation of `exp.draws.1`.
+```{r}
+# 200 random values ~ standard exponential distribution.
+exp.draws.1 <- rexp(200)
+cat("mean value:", mean(exp.draws.1),"\n")
+cat("standard deviation value:", sd(exp.draws.1),"\n")
+```
+
+#### 2. Repeat, but change the rate to 0.1, 0.5, 5 and 10, storing the results in vectors called  `exp.draws.0.1`,  `exp.draws.0.5`,  `exp.draws.5` and  `exp.draws.10`. 
+```{r}
+# 200 random values ~ rate 0.1/0.5/5/10 exponential distribution.
+exp.draws.0.1 <- rexp(200, 0.1)
+exp.draws.0.5 <- rexp(200, 0.5)
+exp.draws.5 <- rexp(200, 5)
+exp.draws.10 <- rexp(200, 10)
+```
+
+#### 3. The function `plot()` is the generic function in R for the visual display of data. `hist()` is a function that takes in and bins data as a side effect. To use this function, we must first specify what we'd like to plot.
+#### a. Use the `hist()` function to produce a histogram of your standard exponential distribution. 
+#### b. Use `plot()` with this vector to display the random values from your standard distribution in order.
+#### c. Now, use `plot()` with two arguments -- any two of your other stored random value vectors -- to create a scatterplot of the two vectors against each other.
+```{r}
+# Q_a: frequency histogram of standard exponential distribution.
+hist(exp.draws.1, main="picture 1: frequency histogram of exp.draws.1")
+# The histogram displays the spread and frequency of these sample data. 
+# In the histogram, each bar groups numbers into the value ranges, and taller bars 
+# show the count of data  which falls in that range. 
+
+# Add: density histogram and its normal distribution fitting.
+hist(exp.draws.1, freq=FALSE, main="picture 2: density histogram of exp.draws.1")
+sample_data <- seq(from=min(exp.draws.1), to=max(exp.draws.1), by=0.1)
+lines(sample_data, dexp(sample_data, 1/mean(exp.draws.1)), lty=2, col=2)
+
+# Q_b: plot the random values of standard expoinential distribution.
+plot(exp.draws.1, main="picture 3: exp.draws.1 sample value")
+# The plot displays 200 random points' value. 
+# x-axis shows index of the points, and y-axis shows value of each point.
+
+# Q_c: scatterplot of two random value vectors.
+plot(exp.draws.0.1, exp.draws.10, main="picture 4: scatterplot of exp.draws.0.1 & exp.draws.10")
+# The plot shows the correlation between the expoinential distribution with rate=0.1 and rate=10
+```
+
+#### 4. We'd now like to compare the properties of each of our vectors. Begin by creating a vector of the means of each of our five distributions in the order we created them and saving this to a variable name of your choice. Using this and other similar vectors, create the following scatterplots:
+#### a. The five means versus the five rates used to generate the distribution.
+#### b. The standard deviations versus the rates.
+#### c. The means versus the standard deviations.
+#### For each plot, explain in words what's going on.
+```{r}
+# Create some expoinential distributions and get the scatterplots: 
+# means&rates, deviations&rates, means&deviations.
+exp.means <- c()
+exp.rates <- c()
+exp.sds <- c()
+for(i in seq(0.1, 10, 0.1)){
+  exp.temp <- rexp(200, i)
+  exp.rates <- c(exp.rates, i)
+  exp.means <- c(exp.means, mean(exp.temp))
+  exp.sds <- c(exp.sds, sd(exp.temp))
+}
+plot(exp.means, exp.rates, main="picture 5: means & rates")
+# According to the picture 5, the correlation between means and rates
+# is more likely fitting the expoinential distribution.
+plot(exp.sds, exp.rates, main="picture 6: means & rates")
+# According to the picture 6, the correlation between deviations and rates
+# is more likely fitting the expoinential distribution.
+plot(exp.means, exp.sds, main="picture 7: means & rates")
+y <- lm(exp.sds~exp.means)
+lines(exp.means, fitted(y), lty=2, col=2)
+# According to the picture 7, the correlation between means and deviations is more 
+# likely fitting a line.
+```
+
+## Part II
+
+-------
+
+#### 5. R's capacity for data and computation is large to what was available 10 years ago. 
+#### a. To show this, generate 1.1 million numbers from the standard exponential distribution and store them in a vector called `big.exp.draws.1`. Calculate the mean and standard deviation.
+```{r}
+big.exp.draws.1 <- rexp(1.1e06)
+big.exp.mean <- mean(big.exp.draws.1)
+cat("mean of 5-a:", big.exp.mean, "\n")
+big.exp.sd <- sd(big.exp.draws.1)
+cat("standard deviation of 5-a:", big.exp.sd, "\n")
+```
+#### b. Plot a histogram of `big.exp.draws.1`.  Does it match the function $1-e^{-x}$?  Should it?
+```{r}
+hist(big.exp.draws.1, main = "picture 8-1: frequency of big.exp.draws.1") 
+hist(big.exp.draws.1, freq = FALSE, main = "picture 8-2: density of big.exp.draws.1")
+sample_data <- seq(from=min(big.exp.draws.1), to=max(big.exp.draws.1), by=0.1)
+lines(sample_data, dexp(sample_data, 1/big.exp.mean), lty=2, col=2)
+# The histogram match the function 1-e^(-x), 
+```
+#### c. Find the mean of all of the entries in `big.exp.draws.1` which are strictly greater than 1. You may need to first create a new vector to identify which elements satisfy this.
+```{r}
+exp.temp <- c()
+for(i in 1:length(big.exp.draws.1)){
+  if(big.exp.draws.1[i] > 1){
+    exp.temp <- c(exp.temp, big.exp.draws.1[i])
+  }
+}
+cat("mean of 5-c:", mean(exp.temp), "\n")
+```
+#### d. Create a matrix, `big.exp.draws.1.mat`, containing the the values in 
+`big.exp.draws.1`, with 1100 rows and 1000 columns. Use this matrix as the input to the `hist()` function and save the result to a variable of your choice. What happens to your data?
+```{r}
+big.exp.draws.1.mat <- matrix(big.exp.draws.1, nrow = 1100, ncol = 1000)
+hist(big.exp.draws.1.mat, main="picture 9: histogram of big.exp.draws.1.mat")
+# The histogram of the vector and matrix are the same.
+# Drawing a histogram is to group data, whether it is a vector or a matrix, it has to
+# traverse all the data, so the data storage form does not affect the result.
+```
+#### e. Calculate the mean of the 371st column of `big.exp.draws.1.mat`.
+```{r}
+cat("mean of 2-e:", mean(big.exp.draws.1.mat[,371]), "\n")
+```
+#### f. Now, find the means of all 1000 columns of `big.exp.draws.1.mat` simultaneously. Plot the histogram of column means.  Explain why its shape does not match the histogram in problem 5b).
+```{r}
+big.exp.col.means <- c()
+for(i in 1:1000){
+  big.exp.col.means <- c(big.exp.col.means, mean(big.exp.draws.1.mat[,i]))
+}
+hist(big.exp.col.means, main = "picture 10: histogram of big.exp.col.means")
+# Each column is a set of random numbers with a sample size of 1100 and subject to the
+# standard exponential distribution. The mean of each group is approximately 1. 
+# Due to the randomness of the data, the mean has an error obeying the normal distribution.
+# Thus, in the histogram, the value of frequency of the means of each col more likely obey 
+# normal distribution instead of standard exponential distribution (like the histogram in 5-b).
+```
+#### g. Take the square of each number in `big.exp.draws.1`, and find the mean of this new vector.  Explain this in terms of the mean and standard deviation of `big.exp.draws.1`. ***Hint:*** think carefully about the formula R uses to calculate the standard deviation.
+```{r}
+big.exp.draws.square <- big.exp.draws.1^2
+big.exp.square.mean <- mean(big.exp.draws.square)
+cat("mean of 5-g:", big.exp.square.mean, "\n")
+big.exp.var.sqrt <- sqrt(abs(big.exp.square.mean - big.exp.mean^2))
+all.equal(big.exp.var.sqrt, big.exp.sd)
+# The variance is equal to the mean of square value minus the square of the mean.
+# Var = E[(X-m)^2] = E(X^2 - 2*X*m + m^2) = E(X^2) - 2m^2 + m^2 = E(X^2) - m^2
+# sd(X) = sqrt(Var)
+# sd(X) = E(X^2) - m^2
+# According to the result, the difference between the two value is very little.
+```
+
+
+
+

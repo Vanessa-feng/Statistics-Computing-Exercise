@@ -1,0 +1,271 @@
+---
+title: "STAT 206 Homework 6"
+author: Xin Feng(Vanessa)
+date: 11/5/2019
+output: pdf_document
+---
+
+**Due Tuesday, November 12, 5:00 PM**
+
+***General instructions for homework***: Homework must be submitted as pdf file, and be sure to include your name in the file.  Give the commands to answer each question in its own code block, which will also produce plots that will be automatically embedded in the output file. Each answer must be supported by written statements as well as any code used.  (Examining your various objects in the "Environment" section of RStudio is insufficient -- you must use scripted commands.)
+
+Part I - Gambler’s Ruin
+==========
+
+1. Suppose you have a bankroll of $1000 and make bets of $100 on a fair game. By simulating the outcome directly for at most 5000 iterations of the game (or hands), estimate the following.  (You must stop playing if your player has gone bust.)
+    a. the probability that you have “busted” (lost all your money) by the time you have placed your one hundredth bet.
+```{r}
+bankroll <- 1000
+bet <- 100
+stop_sign <- 0
+bet.game <- function(balance, result){
+    if(balance<100 & !result){
+        stop_sign=1
+        return(c(balance, stop_sign))
+    }
+    balance <- ifelse(result==1, balance+bet, balance-bet)
+    return(c(balance, stop_sign))
+}
+
+simu.game <- function(bust_time=0, B=1e+3, stop_time=100, prob=c(1/2,1/2)){
+    for(i in 1:B){
+        result <- sample(0:1, stop_time, replace=TRUE, prob=prob)
+        bankroll <- 1000
+        stop_sign <- 0
+        for(j in 1:stop_time){
+            cyc_call <- bet.game(bankroll, result[j])
+            bankroll <- cyc_call[1]
+            stop_sign <- cyc_call[2]
+            if(stop_sign==1){
+                bust_time = bust_time +1
+                break
+            }
+        }
+    }
+    return(c(bust_time, B))
+}
+```
+```{r}
+result <- simu.game()
+cat("The probability that lost all money by the time of 100-th bet: ",
+    result[1]/result[2], "\n")
+```
+    b. the probability that you have busted by the time you have placed your five hundredth bet 
+    by simulating the outcome directly.
+```{r}
+result <- simu.game(stop_time=500)
+cat("The probability that lost all money by the time of 500-th bet: ",
+    result[1]/result[2], "\n")
+```
+    c. the mean time you go bust, given that you go bust within the first 5000 hands.
+```{r}
+simu.game.1 <- function(bet_time=0, B=1e+3, stop_time=5000, prob=c(1/2,1/2)){
+    bet_set <- c()
+    for(i in 1:B){
+        result <- sample(0:1, stop_time, replace=TRUE, prob=prob)
+        bankroll <- 1000
+        stop_sign <- 0
+        bet_time <- 0
+        for(j in 1:stop_time){
+            cyc_call <- bet.game(bankroll, result[j])
+            bankroll <- cyc_call[1]
+            stop_sign <- cyc_call[2]
+            if(stop_sign){
+                break
+            }else{
+                bet_time = bet_time+1
+            }
+        }
+        bet_set <- c(bet_set, bet_time)
+    }
+    return(bet_set)
+}
+```
+```{r}
+cat("Mean time of bust within 5000 hands: ", mean(simu.game.1()), "\n")
+```
+    d. the mean and variance of your bankroll after 100 hands (including busts).
+```{r}
+simu.game.2 <- function(B=1e+3, stop_time=100, prob=c(1/2,1/2)){
+    balance <- c()
+    for(i in 1:B){
+        result <- sample(0:1, stop_time, replace=TRUE, prob=prob)
+        bankroll <- 1000
+        stop_sign <- 0
+        for(j in 1:stop_time){
+            cyc_call <- bet.game(bankroll, result[j])
+            bankroll <- cyc_call[1]
+            stop_sign <- cyc_call[2]
+            if(stop_sign){
+                break
+            }
+        }
+        balance<-c(balance, bankroll)
+    }
+    return(balance)
+}
+```
+```{r}
+result <- simu.game.2()
+cat("Mean of bankroll after 100 hands: ", mean(result), "\n")
+cat("Variance of bankroll after 100 hands: ", var(result), "\n")
+```
+    e. the mean and variance of your bankroll after 500 hands (including busts).
+```{r}
+result <- simu.game.2(stop_time=500)
+cat("Mean of bankroll after 500 hands: ", mean(result), "\n")
+cat("Variance of bankroll after 500 hands: ", var(result), "\n")
+```
+2. Repeat the previous problem with betting on black in American roulette, where the probability of winning on any spin is 18/38 for an even payout.
+```{r}
+# a)
+result_a <- simu.game(prob=c(20/38, 18/38))
+cat("The probability that lost all money by the time of 100-th bet: ",
+    result_a[1]/result_a[2], "\n")
+
+# b)
+result_b <- simu.game(stop_time=500, prob=c(20/38, 18/38))
+cat("The probability that lost all money by the time of 500-th bet: ",
+    result_b[1]/result_b[2], "\n")
+
+# c)
+result_c <- simu.game.1(prob=c(20/38, 18/38))
+cat("Mean time of bust within 5000 hands: ", mean(result_c), "\n")
+
+# d)
+result_d <- simu.game.2(prob=c(20/38, 18/38))
+cat("Mean of bankroll after 100 hands: ", mean(result_d), "\n")
+cat("Variance of bankroll after 100 hands: ", var(result_d), "\n")
+```
+3. For the American roulette problem in the previous question, you calculated a mean value. Because you saved these final results in a vector, use the bootstrap to estimate the variance of the return in each case for your final answer. 
+```{r}
+# Bootstrap-estimate variance(result_c)
+M <- mean(result_c)
+n <- length(result_c)
+boot_c <- vector(mode="numeric", length=0)
+for(i in 1:1000){
+    Xstar <- sample(result_c, n, replace=TRUE)
+    boot_c[i]<-mean(Xstar)
+}
+se_c <- sd(boot_c)
+cat("The variance of mean in Q-c: ", se_c, "\n")
+
+# Bootstrap-estimate variance(result_d)
+M <- mean(result_d)
+n <- length(result_d)
+boot_d <- vector(mode="numeric", length=0)
+for(i in 1:1000){
+    Xstar <- sample(result_d, n, replace=TRUE)
+    boot_d[i]<-mean(Xstar)
+}
+se_d <- sd(boot_d)
+cat("The variance of mean in Q-d: ", se_d, "\n")
+```
+Part II - Elo Ratings
+==========
+
+One of the earliest examples of a convergent, adaptive Markov process was the rating system devised by Arpad Elo to rank chess players. It has endured for so long as a simple system for so long that it is used as a primary ranking system in many other scenarios, including the NBA team rankings (Nate Silver) and Scrabble (NASPA).
+
+The main idea is two players have ratings $R_A$ and $R_B$. The estimated probability that player $A$ will win is modeled by a logistic curve,
+\[
+P(A) = \frac{1}{1 + \exp (R_B - R_A)}
+\]
+and once a game is finished, a player’s rating is updated based on whether they won the game: 
+\[
+R_A (\text{new}) = R_A (\text{old}) + K (1 - P(A))
+\]
+or if the lost the game:
+\[
+R_A (\text{new}) = R_A (\text{old}) - K P(A)
+\]
+for some factor $K$. (Note that both player ratings change.)  Our goal is to simulate a repetitive tournament with 10,000 games to see if it converges on the true values.
+
+4. Create a “true” vector of ratings for 13 players whose ratings range from -2 to 2 in even intervals. Create another vector with the current ratings which will be updated on a game-by-game basis, and a matrix with 13 rows and 10,000 columns into which we will deposit the ratings over time.
+```{r}
+N <- 1e+4
+rt_player <- seq(-2,2,length.out=13)
+rt_update <- rt_player
+rt_record <- matrix(nrow=13, ncol=N)
+```
+5. Write a function that simulates a game between players i and j given their true underlying ratings. This should be a simple draw from `rbinom(1,1,p)` with the appropriate probability.
+```{r}
+Play.game <- function(i,j){
+    Pr_i <- 1/(1+exp(rt_player[j]-rt_player[i]))
+    return(rbinom(1,1,Pr_i))
+}
+result <- Play.game(1,3)
+if(!result){
+    print("Player 3 win the game.")
+}else{
+    print("Player 1 win the game.")
+}
+```
+6. Write a function that, given a value of $K$, replaces the ratings for the two players who just played a game with their updated ratings given the result from the previous question.
+```{r}
+Play.game.1 <- function(i,j,K){
+    Pr_i <- 1/(1+exp(rt_update[j]-rt_update[i]))
+    Pr_j <- 1/(1+exp(rt_update[i]-rt_update[j]))
+    result <- rbinom(1,1,Pr_i)
+    if(result){
+        rt_update[i] <- rt_update[i] + K*(1-Pr_i)
+        rt_update[j] <- rt_update[j] - K*Pr_j
+    }else{
+        rt_update[i] <- rt_update[i] - K*Pr_i
+        rt_update[j] <- rt_update[j] + K*(1-Pr_j)
+    }
+    return(rt_update)
+}
+```
+7. Write a function that selects two players at random from the 13, makes them play a game according to their true ratings, and updates their observed ratings.
+```{r}
+Play.game.2 <- function(K){
+    Py <- sample(1:13, 2)
+    rt_update <- Play.game.1(Py[1], Py[2], K)
+    return(rt_update)
+}
+```
+8. Finally, write a function that simulates a tournament as prescribed above: 10,000 games should be played between randomly chosen opponents, and the updated ratings should be saved in your rating matrix by iteration.
+```{r}
+Play.game.3 <- function(K){
+    n <- 0
+    while(n < N){
+        rt_update <<- Play.game.2(K)
+        n <- n+1
+        rt_record[,n] <- rt_update
+    }
+    return(rt_record)
+}
+
+```
+9. Run this tournament with $K = 0.01$. Plot the rating for the best player over time using `plot(..., ty="l")`; add the rating for the worst player using `lines(...)`. Do they appear to converge to the true ratings?
+```{r}
+Play.game.4 <- function(K=0.01){
+    rt_record <- Play.game.3(K)
+    max_index <- which(rt_record[,N]==max(rt_record[,N]))
+    min_index <- which(rt_record[,N]==min(rt_record[,N]))
+    plot(rt_record[max_index,], ty="l",ylim=c(min(rt_record[max_index,], rt_record[min_index,]),
+                                              max(rt_record[max_index,], rt_record[min_index,])), col=2,
+         main=paste("Compare of the best and worse player(K =",K,")"), xlab="Number of game", ylab="Rating")
+    lines(rt_record[min_index,])
+    legend("right", legend=c(paste("Best player -", max_index), paste("Worse player -", min_index))
+           , col=c(2,1), lty=c(1,1))
+}
+Play.game.4()
+# They appear to converage to the true ratings. 
+# Initially, Player-1's rating is worst and Player-13's rating is best.
+# After 10000 games, Player-1's rating still is worst and Player-13's best.
+# And the ratings are basically stable.
+```
+
+10. Repeat the previous step with $K$ equal to 0.03, 0.06, 0.1, 0.3, 0.6 and 1. Which appears to give the most reliable rating results?
+```{r}
+Play.game.4(K=0.03)
+Play.game.4(K=0.06)
+Play.game.4(K=0.1)
+Play.game.4(K=0.3)
+Play.game.4(K=0.6)
+Play.game.4(K=1)
+# According to these plots, it seems that when K=0.03, the rating result is more reliable 
+# than the other choice..
+# Considering Q-9, when K=0.01, the result is most reliable.
+```

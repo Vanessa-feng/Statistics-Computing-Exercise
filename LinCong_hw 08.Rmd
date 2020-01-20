@@ -1,0 +1,269 @@
+---
+title: "STAT 206 Homework 8"
+author: "lincong"
+date: "2018/12/4"
+output:
+pdf_document:
+includes:
+in_header: header.tex
+keep_tex: yes
+latex_engine: xelatex
+word_document: default
+html_document: default
+---
+
+**Due Thursday, December 6, 5:00 PM**
+
+***General instructions for homework***: Homework must be completed as an R Markdown file.  Be sure to include your name in the file.  Give the commands to answer each question in its own code block, which will also produce plots that will be automatically embedded in the output file. Each answer must be supported by written statements as well as any code used.  (Examining your various objects in the "Environment" section of RStudio is insufficient -- you must use scripted commands.)
+
+Part I - Metropolis-Hasting algorithm
+==========
+
+Suppose $f \sim \Gamma(2,1)$.
+
+1. Write an independence MH sampler with $g \sim \Gamma(2, \theta)$.
+
+```{r}
+ind.chain <- function(x, n, theta = 1) {
+  ## if theta = 1, then this is an iid sampler
+  m <- length(x)
+  x <- append(x, double(n))
+  for(i in (m+1):length(x)){
+    x.prime <- rgamma(1, shape=2, scale=theta)
+    u <- exp((x[(i-1)]-x.prime)*(1-theta))
+    if(runif(1) < u)
+      x[i] <- x.prime
+    else
+      x[i] <- x[(i-1)]
+  }
+  return(x)
+}
+```
+
+2. What is $R(x_t, X^*)$ for this sampler?
+
+$$exp[(x_t???x^???)(1???\theta)]$$
+
+3. Generate 10000 draws from $f$ with $\theta \in \{ 1/2, 1, 2 \}$.
+
+```{r}
+trial1 <- ind.chain(1, 10000, 1/2)
+trial2 <- ind.chain(1, 10000, 1)
+trial3 <- ind.chain(1, 10000, 2)
+```
+
+4. Write a random walk MH sampler with $h \sim N(0, \sigma^2)$.
+
+```{r}
+rw.chain <- function(x, n, sigma = 1) {
+  m <- length(x)
+  x <- append(x, double(n))
+  for(i in (m+1):length(x)){
+    x.prime <- x[(i-1)] + rnorm(1, sd = sigma)
+    u <- exp(x[(i-1)]-x.prime)*(x.prime/x[(i-1)])
+    if(runif(1) < u && x.prime > 0)
+      x[i] <- x.prime
+    else
+      x[i] <- x[(i-1)]
+  }
+  return(x)
+}
+```
+
+5. What is $R(x_t, X^*)$ for this sampler?
+
+$$exp[(x_t???x^???)]*(x^???/x_t)$$
+
+6. Generate 10000 draws from $f$ with $\sigma \in \{ .2, 1, 5 \}$.
+
+```{r}
+rw1 <- rw.chain(1, 10000, .2)
+rw2 <- rw.chain(1, 10000, 1)
+rw3 <- rw.chain(1, 10000, 5)
+```
+
+7. In general, do you prefer an independence chain or a random walk MH sampler?  Why?
+
+```{r}
+par(mfrow=c(2,3))
+plot(trial1, type ="l")
+plot(trial2, type ="l")
+plot(trial3, type ="l")
+plot(rw1, type ="l")
+plot(rw2, type ="l")
+plot(rw3, type ="l")
+```
+
+##According to the plot above, a random walk MH sampler is better.
+
+8. Implement the fixed-width stopping rule for you preferred chain.
+
+```{r}
+library(mcmcse)
+out<-1
+start<-1000
+r<-1000
+eps<-0.1
+sigma<-1
+
+out <- rw.chain(out, start, sigma)
+MCSE <- mcse(out)$se
+N <- length(out)
+t <- qt(.975, (floor(sqrt(N) - 1)))
+muhat <- mean(out)
+check <- MCSE * t
+
+while(eps < check) {
+out <- rw.chain(out, r, sigma)
+MCSE <- append(MCSE, mcse(out)$se)
+N <- length(out)
+t <- qt(.975, (floor(sqrt(N) - 1)))
+muhat <- append(muhat, mean(out))
+check <- MCSE[length(MCSE)] * t
+}
+
+plot(out, type ="l")
+```
+
+
+Part II - **Anguilla** eel data
+==========
+
+Consider the **Anguilla** eel data provided in the `dismo` R package. The data consists of 1,000 observations from a New Zealand survey of site-level presence or absence for the short-finned eel (Anguilla australis). We will use six out of twelve covariates. Five are continuous variables: `SegSumT`, `DSDist`, `USNative`, `DSMaxSlope` and `DSSlope`; one is a categorical variable: `Method`, with five levels `Electric`, `Spo`, `Trap`, `Net` and `Mixture`.
+
+Let $x_i$ be the regression vector of covariates for the $i$th observation of length $k$ and ${\pmb \beta} = \left( \beta_0, \dots, \beta_9 \right)$ be the vector regression coefficients.  For the $i$th observation, suppose $Y_i = 1$ denotes presence and $Y_i = 0$ denotes absence of Anguilla australis. Then the Bayesian logistic regression model is given by
+\[
+\begin{aligned}
+Y_i & \sim Bernoulli(p_i) \; , \\
+p_i & \sim {\exp(x_i^{T}{\pmb \beta}) \over 1+\exp(x_i^{T}{\pmb \beta})} \; \text{ and,} \\ 
+{\pmb \beta} & \sim N({\pmb 0}, \sigma_{\beta}^2{\bf I}_k) \; ,
+\end{aligned}
+\]
+where ${\bf I}_k$ is the $k \times k$ identity matrix. For the analysis, $\sigma_{\beta}^2=100$ was chosen to represent a diffuse prior distribution on ${\pmb \beta}$.  
+
+9. Implement an MCMC sampler for the target distribution using the `MCMClogit` function in the `MCMCpack` package.
+
+```{r}
+library(dismo)
+library(dplyr)
+library(MCMCpack)
+library(MASS)
+data(Anguilla_train)
+aedata<-subset(Anguilla_train, select=c("Angaus", "SegSumT", "DSDist", "USNative", "DSMaxSlope", "USSlope", "Method"))
+posterior <- MCMClogit(Angaus~SegSumT+DSDist+USNative+DSMaxSlope+USSlope+as.factor(Method), b0=0, B0=.01, data=aedata)
+```
+
+10. Comment on the mixing properties for your sampler.  Include at least one plot in support of your comments.
+
+```{r}
+par(mfrow=c(4,1))
+plot(posterior)
+```
+
+##All the samplers seem to mix well after 1000 burn-in period. 
+
+11. Run your sampler for 100,000 iterations.  Estimate the posterior mean along with an 80\% Bayesian credible interval for each regression coefficient in the model.  Be sure to include uncertainty estimates.
+
+```{r}
+library(mcmcse)
+posterior.it <- MCMClogit(Angaus~SegSumT+DSDist+USNative+DSMaxSlope+USSlope+as.factor(Method), b0=0, B0=.01, data=aedata, mcmc=100000)
+for (i in 1:10){
+  left.est<-mcse.q(posterior.it[,i], .1)$est
+  left.se<-mcse.q(posterior.it[,i], .1)$se
+  right.est<-mcse.q(posterior.it[,i], .9)$est
+  right.se<-mcse.q(posterior.it[,i], .9)$se
+  print(paste("The 80% Bayesian credible interval for",expression(beta),i-1,"is (",left.est,"+/-",left.se,",",right.est,"+/-",right.se,")"))
+}
+```
+
+12. Compare your Bayesian estimates to those obtained via maximum likelihood estimation.
+
+```{r}
+beta.bayes.est<-c()
+for (i in 1:10){
+  beta.bayes.est[i]<-mcse(posterior.it[,i])$est
+}
+beta.bayes.est
+
+library(Rlab)
+aedata<-subset(Anguilla_train, select=c("Angaus", "SegSumT", "DSDist", "USNative", "DSMaxSlope", "USSlope", "Method"))
+aedata$mixture<-ifelse(aedata$Method=="mixture", 1, 0)
+aedata$net<-ifelse(aedata$Method=="net", 1, 0)
+aedata$spo<-ifelse(aedata$Method=="spo", 1, 0)
+aedata$trap<-ifelse(aedata$Method=="trap", 1, 0)
+aedata<-aedata[, -7]
+aedata.x<-cbind(c(rep(1, times=1000)), aedata[,-1])
+nllh<-function(p=c(rep(0,times=10))){
+  p<-as.matrix(p)
+  aedata.x<-as.matrix(aedata.x)
+  num<-exp(aedata.x %*% p)
+  p<-num/(1+num)
+  sum<-0
+  for (i in 1:1000){
+    sum<-dbern(aedata[,1][i], p[i], log=TRUE)
+  }
+  return(-sum) 
+}
+nlm(nllh, p=beta.bayes.est)$estimate
+```
+
+
+Part II - Permutation tests
+==========
+
+The Cram\'er von Mises statistic estimates the integrated square distance between distributions. It can be computed using the following formula
+\[
+W=\frac{mn}{(m+n)^2}\left[ \sum_{i=1}^n(F_n(x_i)-G_m(x_i))^2 +\sum_{j=1}^m (F_n(y_j)-G_m(y_j))^2\right]
+\]
+where $F_n$ and $G_m$ are the corresponding empirical cdfs. 
+
+13. Implement the two sample Cram\'er von Mises test for equal distributions as a permutation test. Apply it to the `chickwts` data.
+
+```{r}
+data(chickwts)
+attach(chickwts)
+library(RVAideMemoire)
+
+X <- as.vector(chickwts$weight[chickwts$feed=="soybean"])
+Y <- as.vector(chickwts$weight[chickwts$feed=="linseed"])
+B <- 999
+Z <- c(X,Y)
+K <- 1:26
+D0<-CvM.test(X,Y)$statistic
+D<-numeric(B)
+for( i in 1:B){
+  k <- sample(K, size=14, replace=F)
+  x1 <- Z[k]
+  y1 <- Z[-k]
+  D[i] <- CvM.test(x1, y1)$statistic
+}
+p <- mean(c(D0,D) >= D0)
+p
+hist(D, breaks=50, main="Permuation Distribution")
+points(D0, 0, cex=1, pch=16)
+```
+
+14. How would you implement the bivariate Spearman rank correlation test for independence as a permutation test? The Spearman rank correlation test statistic can be obtained from the function `cor` with `method="spearman"`. Compare the achieved significance level of the permutation test with the p-value reported by `cor.test` on the same samples.
+
+```{r}
+Score <- c(58,  48,  48,  41,  34,  43,  38,  53,  41,  60,  55,  44,  
+           43, 49,  47,  33,  47,  40,  46,  53,  40,  45,  39,  47,  
+           50,  53,  46,  53)
+SAT <- c(590, 590, 580, 490, 550, 580, 550, 700, 560, 690, 800, 600, 
+           650, 580, 660, 590, 600, 540, 610, 580, 620, 600, 560, 560, 
+           570, 630, 510, 620)
+r.obt <- cor(Score, SAT, method="spearman")
+nreps <- 5000
+r.random <- numeric(nreps)
+for (i in 1:nreps) {
+Y <- Score
+X <- sample(SAT, 28, replace = FALSE)
+r.random[i] <- cor(X,Y, method="spearman")
+   }
+prob <- length(r.random[r.random >= r.obt])/nreps
+prob
+
+cor.test(Score, SAT, method="spearman")$p.value
+```
+
+##The achieved significance level of the permutation test is slightly smaller than the p-value reported by cor.test on the same samples.

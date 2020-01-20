@@ -1,0 +1,172 @@
+---
+title: "STAT 206 Homework 1"
+author: Vanessa_Feng
+date: 09/29/2019
+output: pdf_document
+---
+
+**Due Monday, October 7, 5:00 PM**
+
+***General instructions for homework***: Homework must be submitted as pdf file, and be sure to include your name in the file.  Give the commands to answer each question in its own code block, which will also produce plots that will be automatically embedded in the output file. Each answer must be supported by written statements as well as any code used.  (Examining your various objects in the "Environment" section of RStudio is insufficient -- you must use scripted commands.)
+
+### 1. The data set at [http://www.faculty.ucr.edu/~jflegal/206/rnf6080.dat] records hourly rainfall at a certain location in Canada, every day from 1960 to 1980.
+#### a. First, we need to load the data set into R using the command `read.table()`. Use the help function to learn what arguments this function takes. Once you have the necessary input, load the data set into R and make it a data frame called `rain.df`.
+```{r}
+# Q_a:load data set
+rain.df<-read.table(url("http://www.faculty.ucr.edu/~jflegal/206/rnf6080.dat"))
+if(is.data.frame(rain.df)){
+  print("rain.df is a data frame.")
+}else{
+  print("something wrong!")
+}
+```
+#### b. How many rows and columns does `rain.df` have? (If there are not 5070 rows and 27 columns, something is wrong; check the previous part to see what might have gone wrong in the previous part.)
+```{r}
+# Q_b:rows and columns number
+# three ways to get the number of rows:
+dim(rain.df)[1]
+nrow(rain.df)
+length(rain.df[,1])
+# three ways to get the number of cols:
+dim(rain.df)[2]
+ncol(rain.df)
+length(rain.df[0,])
+```
+#### c. What are the names of the columns of `rain.df`?
+```{r}
+# Q_c:name of columns
+col_name<-colnames(rain.df)
+col_name
+```
+#### d. What is the value of row 5, column 7 of `rain.df`?
+```{r}
+# Q_d:value(5,7)
+value_5_7<-rain.df[5,7]
+value_5_7
+```
+#### e. Display the second row of `rain.df` in its entirety.
+```{r}
+# Q_e:show row2
+row_2<-rain.df[2,]
+row_2
+```
+#### f. Explain what this command does:
+```
+names(rain.df) <- c("year","month","day",seq(0,23))
+```
+#### by running it on your data and examining the object. (You may find the display functions `head()` and `tail()` useful here.) Is it clear now what the last 24 columns represent?
+```{r}
+# Q_f:cols' names
+# Name the 27 cols as "year", "month","day" and 0~23.
+names(rain.df) <- c("year","month","day",seq(0,23))
+# First 2 rows:
+head(rain.df,2)
+# Last 3 rows:
+tail(rain.df,3)
+# Last 24 cols represent 24 hours of a day.
+```
+#### g. Create a new column in the data frame called `daily`, which is the sum of the rightmost 24 columns. With this column, create a histogram of the values in this column, which are supposed to be daily rainfall values. What is wrong with this picture?  
+```{r}
+# Q-g:rows' sum
+daily<-rowSums(rain.df[,4:27])
+hist(daily, xlab="rainfall_value", main="picture 1: histogram of daily rainfall value", 
+     nclass = 30,density = 20,angle = 45)
+# There are some outliers, which are unuseful when analysing the values.
+```
+#### h. Create a new data frame `rain.df.fixed` that takes the original and fixes it for the apparent flaw you have discovered. Having done this, produce a new histogram with the corrected data and explain why this is more reasonable.
+```{r}
+rain.df.fixed <- rain.df
+for (i in c(1:nrow(rain.df))){
+  for (j in 4:27){
+    if (rain.df[i,j]<0){
+    rain.df.fixed[i,j] <- 0
+    }
+  }
+}
+daily.fixed <- rowSums(rain.df.fixed[,4:27])
+
+hist(daily.fixed, xlab="rainfall_value", main="picture 2: histogram of fixed daily 
+     rainfall value", nclass = 30,density = 20,angle = 45)
+# The values of rainfall are supposed to be greater than or equal to zero. 
+# Therefore, some outliers have negative influence when analyzing the distribution 
+# of overall data.
+```
+
+### 2. Syntax and class-typing.
+#### a. For each of the following commands, either explain why they should be errors, or explain the non-erroneous result.
+
+```{r, eval=FALSE}
+vector1 <- c("5", "12", "7", "32")
+max(vector1)
+sort(vector1)
+# Right
+# Sort vector1 and outcome:"12" "32" "5" "7", which is because that elements in vector1
+# are all chacters. If object is a character vector, all elements must share the same 
+# encoding. Only UTF-8 (including ASCII) and Latin-1 encodings are supported. And sorting
+# follows the rule that sort the first character, then the second.
+# First characters of each element are "5" "1" "7" 3", According to the ASCII table, the
+# corresponding ASCII numbers are 53 49 55 51. So the sorting result is: "12" "32" "5" "7".
+sum(vector1)
+# Error
+# Sum function cannot be used for the character elements. Thus, the result is error.
+```
+
+#### b. For the next series of commands, either explain their results, or why they should produce errors.
+##### i)
+
+```{r, eval=FALSE}
+vector2 <- c("5",7,12)
+vector2[2] + vector2[3]
+```
+```{r}
+# Error
+vector2 <- c("5",7,12)
+cat("The second element in vector2 is number:", is.numeric(vector2[2]), "\n")
+# When one or more character in a list, other elements in the list are characters. 
+# In the above case, vector2 prints the list as characters. 
+# Add operation cannot be used for the non-numberic elements.
+```
+##### ii)
+```{r, eval=FALSE}
+dataframe3 <- data.frame(z1="5",z2=7,z3=12)
+dataframe3[1,2] + dataframe3[1,3]
+```
+```{r}
+# Right
+dataframe3 <- data.frame(z1="5",z2=7,z3=12)
+cat("element(1,2) of dataframe3 is number:", is.numeric(dataframe3[1,2]), "\n")
+cat("element(1,3) of dataframe3 is number:", is.numeric(dataframe3[1,3]), "\n")
+# In data frame, elements retain their properties. And two numbers can take the add operation.
+```
+##### iii)
+```{r,eval=FALSE}
+list4 <- list(z1="6", z2=42, z3="49", z4=126)
+list4[[2]]+list4[[4]]
+# Right
+# list4[[2]] and list4[[4]] are numberic, which can take the add operation.
+list4[2]+list4[4]
+```
+```{r}
+list4 <- list(z1="6", z2=42, z3="49", z4=126)
+cat("Type of list4[2]:", typeof(list4[2]), "\n")
+# Error
+# list4[2] and list4[4] are list-type, which cannot take the add operation.
+```
+
+### 3. Working with functions and operators.
+#### a. The colon operator will create a sequence of integers in order. It is a special case of the function `seq()` which you saw earlier in this assignment. Using the help command `help(seq)` to learn about the function, design an expression that will give you the sequence of numbers from 1 to 10000 in increments of 372. Design another that will give you a sequence between 1 and 10000 that is exactly 50 numbers in length.
+  ```{r}
+  # sequence: 1~10000 with increments of 372
+  seq1 <- seq(1, 10000, by=372)
+  
+  # sequence: 1~10000, length=50
+  seq2 <- seq(1, 10000, length.out=50)
+  ```
+#### b. The function `rep()` repeats a vector some number of times. Explain the difference between `rep(1:3, times=3) and rep(1:3, each=3).
+```{r}
+# rep function
+# "times=r" controls the repeat times=r with the repeat form that the second round 
+# of data appears after the first ones until the r-th round.
+# "each=r" controls the repeat times=r with the repeat form that the first number 
+# repeats r times and then the second ones.
+```
